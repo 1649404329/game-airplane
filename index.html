@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>躲避炮弹 · 自定义BGM版</title>
+    <style>
+        * { user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; min-height: 100vh; background: linear-gradient(145deg, #0a0f1e 0%, #0c1222 100%); display: flex; justify-content: center; align-items: center; font-family: 'Segoe UI', 'Orbitron', monospace; overflow: hidden; }
+        .game-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; border-radius: 36px; background: rgba(10, 14, 23, 0.65); backdrop-filter: blur(2px); }
+        canvas { display: block; margin: 0 auto; border-radius: 28px; box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.3), 0 10px 30px rgba(0, 0, 0, 0.5); cursor: none; background: radial-gradient(circle at 30% 20%, #111827, #03060c); }
+        .info-panel { display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-top: 20px; gap: 32px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px); padding: 12px 28px; border-radius: 60px; border: 1px solid rgba(0, 255, 255, 0.25); flex-wrap: wrap; }
+        .score-box, .best-box { text-align: center; letter-spacing: 1px; }
+        .score-label, .best-label { font-size: 0.9rem; font-weight: 600; color: #7dd3fc; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 40px; display: inline-block; }
+        .score-value, .best-value { font-size: 2.8rem; font-weight: 800; margin-left: 12px; color: #f0f9ff; text-shadow: 0 0 8px #0ff; font-family: 'Orbitron', monospace; }
+        button { background: linear-gradient(135deg, #1e2a3e, #0f172a); border: none; color: #ccf; font-weight: bold; font-size: 1.2rem; padding: 8px 24px; border-radius: 60px; cursor: pointer; transition: 0.2s; border: 1px solid rgba(0, 255, 255, 0.5); }
+        button:hover { transform: scale(1.02); background: linear-gradient(135deg, #2a3a50, #1e2a3e); border-color: cyan; }
+        .music-control { margin-top: 12px; display: flex; gap: 16px; align-items: center; background: rgba(0,0,0,0.5); padding: 6px 20px; border-radius: 60px; }
+        .music-control span { color: #9cf; font-size: 0.85rem; }
+        .volume-slider { width: 100px; vertical-align: middle; }
+        .tips { margin-top: 8px; font-size: 0.8rem; color: #8ca3ba; background: rgba(0,0,0,0.4); padding: 6px 16px; border-radius: 80px; }
+    </style>
+</head>
+<body>
+<div>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="1000" height="650"></canvas>
+        <div class="info-panel">
+            <div class="score-box"><span class="score-label">⚡ 战绩 ⚡</span><span class="score-value" id="scoreDisplay">0</span></div>
+            <div class="best-box"><span class="score-label">🏆 最高躲避</span><span class="score-value" id="bestDisplay">0</span></div>
+            <button id="restartButton">✈ 重新起飞 ✈</button>
+        </div>
+        <div class="music-control">
+            <span>🎵 背景音乐</span>
+            <button id="muteToggleBtn">🔊 静音</button>
+            <span>音量</span>
+            <input type="range" id="volumeControl" min="0" max="100" value="70" class="volume-slider">
+        </div>
+        <div class="tips">🖱️ 鼠标移动控制战机 | 💣 躲避红色炮弹 | 🎵 音频文件请在代码中修改路径</div>
+    </div>
+</div>
+
+<script>
+(function(){
+    // ========== 第一步：在这里设置您的本地音频文件 ==========
+    // 请将您的音频文件（比如 bgm.mp3）放在和本网页同一目录下，然后修改下面的路径
+    const CUSTOM_BGM_PATH = "倒计时音效mp3_爱给网_aigei_com.mp3";   // ← 改成您的文件名，例如 "my_music.mp3" 或 "./sounds/background.ogg"
+    // ====================================================
+    
+    // ---------- DOM ----------
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreSpan = document.getElementById('scoreDisplay');
+    const bestSpan = document.getElementById('bestDisplay');
+    const restartBtn = document.getElementById('restartButton');
+    const muteToggleBtn = document.getElementById('muteToggleBtn');
+    const volumeSlider = document.getElementById('volumeControl');
+    
+    const W = 1000, H = 650;
+    canvas.width = W; canvas.height = H;
+    
+    // ---------- 游戏状态 ----------
+    let gameActive = true;
+    let score = 0;
+    let bestScore = 0;
+    const PLAYER_RADIUS = 22;
+    let playerX = W/2, playerY = H-70;
+    let projectiles = [];
+    const BASE_RADIUS = 12;
+    let currentBaseSpeed = 3.2;
+    let currentSpawnChance = 0.018;
+    const MAX_SPEED = 8.2, MAX_SPAWN = 0.075;
+    
+    // ---------- 音频系统 ----------
+    let bgmAudio = new Audio();
+    bgmAudio.loop = true;
+    bgmAudio.volume = 0.7;
+    let musicMuted = false;
+    let audioUnlocked = false;
+    
+    // 尝试加载并播放本地音频
+    function loadAndPlayBGM() {
+        if (!CUSTOM_BGM_PATH) {
+            console.warn("未设置音频路径");
+            return;
+        }
+        bgmAudio.src = CUSTOM_BGM_PATH;
+        bgmAudio.load();
+        if (audioUnlocked && !musicMuted && gameActive) {
+            bgmAudio.play().catch(e => console.warn("播放失败，请检查音频路径", e));
+        }
+    }
+    
+    // 用户交互解锁音频 (浏览器自动播放策略)
+    function unlockAudio() {
+        if (audioUnlocked) return;
+        audioUnlocked = true;
+        if (!musicMuted && gameActive) {
+            bgmAudio.play().catch(e => console.log("音频解锁失败", e));
+        }
+    }
+    
+    // 静音切换
+    function toggleMute() {
+        musicMuted = !musicMuted;
+        muteToggleBtn.innerText = musicMuted ? "🔇 静音" : "🔊 静音";
+        if (musicMuted) {
+            bgmAudio.pause();
+        } else {
+            if (audioUnlocked && gameActive) {
+                bgmAudio.play().catch(e => console.log);
+            }
+        }
+    }
+    
+    function setVolume(val) {
+        bgmAudio.volume = val / 100;
+    }
+    
+    // 游戏结束时暂停音乐
+    function pauseMusicOnGameOver() {
+        if (!gameActive) bgmAudio.pause();
+    }
+    
+    // 重启时恢复音乐
+    function resumeMusicOnRestart() {
+        if (!musicMuted && audioUnlocked && gameActive) {
+            bgmAudio.play().catch(e => console.log);
+        }
+    }
+    
+    // ---------- 游戏逻辑 (经典躲避玩法) ----------
+    function loadBestScore() { try { let saved = localStorage.getItem('pilotBestScore'); bestScore = saved && !isNaN(parseInt(saved)) ? parseInt(saved) : 0; bestSpan.innerText = bestScore; } catch(e) { bestScore=0; bestSpan.innerText="0"; } }
+    function saveBestScore() { if(score>bestScore) { bestScore=score; bestSpan.innerText=bestScore; try{localStorage.setItem('pilotBestScore',bestScore);}catch(e){} } }
+    function updateDifficulty() { let factor = Math.min(1.0, score/480); currentBaseSpeed = Math.min(MAX_SPEED, Math.max(2.8, 3.2 + factor*(MAX_SPEED-3.2))); currentSpawnChance = Math.min(MAX_SPAWN, Math.max(0.016, 0.018 + factor*(MAX_SPAWN-0.018))); }
+    function addScore(amount) { if(!gameActive) return; score+=amount; scoreSpan.innerText=Math.floor(score); if(score>bestScore) saveBestScore(); updateDifficulty(); }
+    function spawnProjectile() { let randX = BASE_RADIUS + Math.random()*(W-2*BASE_RADIUS); let finalSpeed = currentBaseSpeed + (Math.random()-0.5)*1.0; finalSpeed = Math.min(MAX_SPEED+0.8, Math.max(2.0, finalSpeed)); projectiles.push({ x: randX, y: -BASE_RADIUS, radius: BASE_RADIUS, speedY: finalSpeed }); }
+    function initProjectiles(count) { for(let i=0;i<count;i++) { let randX = BASE_RADIUS+Math.random()*(W-2*BASE_RADIUS); projectiles.push({ x: randX, y: -BASE_RADIUS-Math.random()*100, radius: BASE_RADIUS, speedY: 2.8+Math.random()*2.5 }); } }
+    function updateProjectiles() { if(!gameActive) return; let toRemove=[]; for(let i=0;i<projectiles.length;i++) { projectiles[i].y += projectiles[i].speedY; if(projectiles[i].y - projectiles[i].radius > H) toRemove.push(i); } for(let i=toRemove.length-1;i>=0;i--) { projectiles.splice(toRemove[i],1); addScore(10); } for(let p of projectiles) { if(Math.hypot(playerX-p.x, playerY-p.y) < PLAYER_RADIUS + p.radius) { gameActive=false; bgmAudio.pause(); break; } } }
+    function trySpawn() { if(!gameActive) return; if(Math.random()<currentSpawnChance) spawnProjectile(); if(score>150 && Math.random()<0.12 && currentSpawnChance>0.03) spawnProjectile(); }
+    function clampPlayer() { playerX = Math.min(W-PLAYER_RADIUS, Math.max(PLAYER_RADIUS, playerX)); playerY = Math.min(H-PLAYER_RADIUS-6, Math.max(PLAYER_RADIUS+8, playerY)); }
+    function handleMouseMove(e) { unlockAudio(); const rect = canvas.getBoundingClientRect(); let cx = (e.clientX - rect.left) * (W/rect.width); let cy = (e.clientY - rect.top) * (H/rect.height); playerX = Math.min(W-PLAYER_RADIUS, Math.max(PLAYER_RADIUS, cx)); playerY = Math.min(H-PLAYER_RADIUS-6, Math.max(PLAYER_RADIUS+8, cy)); }
+    function resetGame() { projectiles = []; score=0; scoreSpan.innerText="0"; currentBaseSpeed=3.2; currentSpawnChance=0.018; playerX = Math.min(W-PLAYER_RADIUS, Math.max(PLAYER_RADIUS, W/2)); playerY = H-70; gameActive=true; if(bestScore>0) bestSpan.innerText=bestScore; else loadBestScore(); updateDifficulty(); initProjectiles(6+Math.floor(Math.random()*4)); if(!musicMuted && audioUnlocked) { bgmAudio.play().catch(e=>console.log); } }
+    function restartGame() { resetGame(); }
+    
+    // ----- 绘图 -----
+    function drawStars() { for(let i=0;i<180;i++) { let sx=(i*131)%W, sy=(i*253)%H; ctx.fillStyle=`rgba(255,240,200,${0.3+Math.sin(Date.now()*0.003+i)*0.2})`; ctx.beginPath(); ctx.arc(sx,sy,1.2,0,Math.PI*2); ctx.fill(); } }
+    function drawPlayer() { ctx.save(); ctx.shadowBlur=12; ctx.shadowColor="#0af"; let jet=3+Math.sin(Date.now()*0.015)*3; ctx.beginPath(); ctx.moveTo(playerX-12,playerY+12); ctx.lineTo(playerX,playerY+22+jet); ctx.lineTo(playerX+12,playerY+12); ctx.fillStyle="#ff7b2c"; ctx.fill(); ctx.beginPath(); ctx.moveTo(playerX-6,playerY+14); ctx.lineTo(playerX,playerY+20+jet*0.7); ctx.lineTo(playerX+6,playerY+14); ctx.fillStyle="#ffb347"; ctx.fill(); ctx.beginPath(); ctx.moveTo(playerX,playerY-22); ctx.lineTo(playerX-18,playerY+6); ctx.lineTo(playerX-8,playerY+2); ctx.lineTo(playerX-8,playerY+10); ctx.lineTo(playerX,playerY+4); ctx.lineTo(playerX+8,playerY+10); ctx.lineTo(playerX+8,playerY+2); ctx.lineTo(playerX+18,playerY+6); ctx.closePath(); let grad=ctx.createLinearGradient(playerX-8,playerY-8,playerX+8,playerY+12); grad.addColorStop(0,'#5bc0ff'); grad.addColorStop(1,'#2b6fcf'); ctx.fillStyle=grad; ctx.fill(); ctx.strokeStyle="#c0f4ff"; ctx.lineWidth=1.5; ctx.stroke(); ctx.beginPath(); ctx.arc(playerX,playerY-8,4,0,Math.PI*2); ctx.fillStyle="#aaffff"; ctx.fill(); ctx.fillStyle="white"; ctx.beginPath(); ctx.arc(playerX-1,playerY-9,1.2,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    function drawProjectiles() { for(let p of projectiles) { ctx.save(); ctx.shadowBlur=8; ctx.shadowColor="#f66"; let grad=ctx.createRadialGradient(p.x-3,p.y-3,2,p.x,p.y,p.radius); grad.addColorStop(0,'#ff4d4d'); grad.addColorStop(1,'#aa0000'); ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(p.x,p.y,p.radius-1,0,Math.PI*2); ctx.fill(); ctx.fillStyle="#ff9f4a"; ctx.beginPath(); ctx.arc(p.x-2,p.y-2,3,0,Math.PI*2); ctx.fill(); ctx.restore(); } }
+    function drawGameOver() { ctx.fillStyle="rgba(0,0,0,0.75)"; ctx.fillRect(0,0,W,H); ctx.font="bold 44px Orbitron"; ctx.fillStyle="#ff3366"; ctx.textAlign="center"; ctx.fillText("💥 坠毁 💥",W/2,H/2-40); ctx.font="26px monospace"; ctx.fillStyle="#ffcc88"; ctx.fillText("点击「重新起飞」继续挑战",W/2,H/2+40); ctx.textAlign="left"; }
+    function drawHUD() { if(!gameActive) return; ctx.font="14px Segoe UI"; ctx.fillStyle="#caf0ff"; ctx.textAlign="right"; ctx.fillText(`⚡ 弹速: ${currentBaseSpeed.toFixed(1)}  |  💨 密度: ${(currentSpawnChance*100).toFixed(1)}%`, W-20,35); ctx.textAlign="left"; let pulse=0.6+Math.sin(Date.now()*0.012)*0.3; ctx.beginPath(); ctx.arc(playerX,playerY,PLAYER_RADIUS+3,0,Math.PI*2); ctx.strokeStyle=`rgba(100,200,255,${0.3*pulse})`; ctx.lineWidth=2; ctx.stroke(); }
+    
+    function updateGame() { if(gameActive) { updateProjectiles(); trySpawn(); clampPlayer(); } }
+    function render() { ctx.clearRect(0,0,W,H); drawStars(); drawProjectiles(); drawPlayer(); drawHUD(); if(!gameActive) drawGameOver(); }
+    function gameLoop() { updateGame(); render(); requestAnimationFrame(gameLoop); }
+    
+    // 事件绑定
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('click', unlockAudio);
+    restartBtn.addEventListener('click', () => { restartGame(); });
+    muteToggleBtn.addEventListener('click', toggleMute);
+    volumeSlider.addEventListener('input', (e) => setVolume(e.target.value));
+    
+    // 初始化
+    loadBestScore();
+    resetGame();
+    gameLoop();
+    loadAndPlayBGM();  // 预加载音频
+})();
+</script>
+</body>
+</html>
