@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>躲避炮弹 · 移动端适配版</title>
+    <title>躲避炮弹 · 移动触摸完美版</title>
     <style>
         * {
             user-select: none;
             -webkit-tap-highlight-color: transparent;
-            touch-action: none;  /* 禁止触摸滚动 */
+            touch-action: none;  /* 禁止浏览器滚动/缩放 */
         }
-
         body {
             margin: 0;
             min-height: 100vh;
@@ -22,7 +21,6 @@
             overflow: hidden;
             touch-action: none;
         }
-
         .game-container {
             display: flex;
             flex-direction: column;
@@ -36,19 +34,17 @@
             max-width: 1000px;
             box-sizing: border-box;
         }
-
         canvas {
             display: block;
             margin: 0 auto;
             border-radius: 24px;
             box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.3), 0 10px 25px rgba(0, 0, 0, 0.5);
-            cursor: none;
             background: radial-gradient(circle at 30% 20%, #111827, #03060c);
             width: 100%;
             height: auto;
             aspect-ratio: 1000 / 650;
+            touch-action: none;
         }
-
         .info-panel {
             display: flex;
             justify-content: space-between;
@@ -63,82 +59,15 @@
             border: 1px solid rgba(0, 255, 255, 0.25);
             flex-wrap: wrap;
         }
-
-        .score-box, .best-box {
-            text-align: center;
-            flex: 1;
-        }
-
-        .score-label, .best-label {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: #7dd3fc;
-            background: rgba(0,0,0,0.5);
-            padding: 3px 10px;
-            border-radius: 40px;
-            display: inline-block;
-        }
-
-        .score-value, .best-value {
-            font-size: 1.8rem;
-            font-weight: 800;
-            margin-left: 6px;
-            color: #f0f9ff;
-            text-shadow: 0 0 6px #0ff;
-            font-family: 'Orbitron', monospace;
-        }
-
-        button {
-            background: linear-gradient(135deg, #1e2a3e, #0f172a);
-            border: none;
-            color: #ccf;
-            font-weight: bold;
-            font-size: 1rem;
-            padding: 6px 18px;
-            border-radius: 60px;
-            cursor: pointer;
-            transition: 0.2s;
-            border: 1px solid rgba(0, 255, 255, 0.5);
-            touch-action: manipulation;
-        }
-
-        button:active {
-            transform: scale(0.96);
-        }
-
-        .music-control {
-            margin-top: 10px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0,0,0,0.5);
-            padding: 6px 16px;
-            border-radius: 60px;
-            flex-wrap: wrap;
-        }
-
-        .music-control span {
-            color: #9cf;
-            font-size: 0.8rem;
-        }
-
-        .volume-slider {
-            width: 100px;
-            vertical-align: middle;
-        }
-
-        .tips {
-            margin-top: 8px;
-            font-size: 0.7rem;
-            color: #8ca3ba;
-            background: rgba(0,0,0,0.4);
-            padding: 5px 12px;
-            border-radius: 80px;
-            text-align: center;
-        }
-
-        /* 手机优化 */
+        .score-box, .best-box { text-align: center; flex: 1; }
+        .score-label, .best-label { font-size: 0.7rem; font-weight: 600; color: #7dd3fc; background: rgba(0,0,0,0.5); padding: 3px 10px; border-radius: 40px; display: inline-block; }
+        .score-value, .best-value { font-size: 1.8rem; font-weight: 800; margin-left: 6px; color: #f0f9ff; text-shadow: 0 0 6px #0ff; font-family: 'Orbitron', monospace; }
+        button { background: linear-gradient(135deg, #1e2a3e, #0f172a); border: none; color: #ccf; font-weight: bold; font-size: 1rem; padding: 6px 18px; border-radius: 60px; cursor: pointer; transition: 0.2s; border: 1px solid rgba(0, 255, 255, 0.5); touch-action: manipulation; }
+        button:active { transform: scale(0.96); }
+        .music-control { margin-top: 10px; display: flex; gap: 12px; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 60px; flex-wrap: wrap; }
+        .music-control span { color: #9cf; font-size: 0.8rem; }
+        .volume-slider { width: 100px; }
+        .tips { margin-top: 8px; font-size: 0.7rem; color: #8ca3ba; background: rgba(0,0,0,0.4); padding: 5px 12px; border-radius: 80px; text-align: center; }
         @media (max-width: 700px) {
             .info-panel { gap: 8px; padding: 8px 15px; }
             .score-value, .best-value { font-size: 1.4rem; }
@@ -163,19 +92,16 @@
             <span>音量</span>
             <input type="range" id="volumeControl" min="0" max="100" value="70" class="volume-slider">
         </div>
-        <div class="tips">
-            🖱️ 鼠标 / 👆 手指滑动 → 控制战机 &nbsp;|&nbsp; 💣 躲避红色炮弹
-        </div>
+        <div class="tips">👆 手指在画布上滑动 → 控制战机 &nbsp;|&nbsp; 💣 躲避红色炮弹</div>
     </div>
 </div>
 
 <script>
 (function(){
     // ========== 请在此处修改您的本地音频文件名 ==========
-    const CUSTOM_BGM_PATH = "倒计时音效mp3_爱给网_aigei_com.mp3";   // 改成您的音频文件（例如 "my_music.mp3"）
+    const CUSTOM_BGM_PATH = "倒计时音效mp3_爱给网_aigei_com.mp3";   // 改成您的音频文件，例如 "my_music.mp3"
     // =================================================
 
-    // ---------- DOM ----------
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const scoreSpan = document.getElementById('scoreDisplay');
@@ -184,30 +110,23 @@
     const muteToggleBtn = document.getElementById('muteToggleBtn');
     const volumeSlider = document.getElementById('volumeControl');
     
-    // 固定逻辑尺寸 1000x650，但画布实际CSS会缩放
-    const LOGIC_W = 1000;
-    const LOGIC_H = 650;
-    canvas.width = LOGIC_W;
-    canvas.height = LOGIC_H;
+    const LOGIC_W = 1000, LOGIC_H = 650;
+    canvas.width = LOGIC_W; canvas.height = LOGIC_H;
     
-    // ---------- 游戏状态 ----------
     let gameActive = true;
-    let score = 0;
-    let bestScore = 0;
+    let score = 0, bestScore = 0;
     const PLAYER_RADIUS = 22;
     let playerX = LOGIC_W/2, playerY = LOGIC_H-70;
     let projectiles = [];
     const BASE_RADIUS = 12;
-    let currentBaseSpeed = 3.2;
-    let currentSpawnChance = 0.018;
+    let currentBaseSpeed = 3.2, currentSpawnChance = 0.018;
     const MAX_SPEED = 8.2, MAX_SPAWN = 0.075;
     
-    // ---------- 音频系统 ----------
+    // 音频
     let bgmAudio = new Audio();
     bgmAudio.loop = true;
     bgmAudio.volume = 0.7;
-    let musicMuted = false;
-    let audioUnlocked = false;
+    let musicMuted = false, audioUnlocked = false;
     
     function loadAndPlayBGM() {
         if (!CUSTOM_BGM_PATH) return;
@@ -217,32 +136,22 @@
             bgmAudio.play().catch(e => console.warn("音频播放失败，请检查路径", e));
         }
     }
-    
     function unlockAudio() {
         if (audioUnlocked) return;
         audioUnlocked = true;
         if (!musicMuted && gameActive) {
-            bgmAudio.play().catch(e => console.log("音频解锁失败", e));
+            bgmAudio.play().catch(e => console.log);
         }
     }
-    
     function toggleMute() {
         musicMuted = !musicMuted;
         muteToggleBtn.innerText = musicMuted ? "🔇 静音" : "🔊 静音";
-        if (musicMuted) {
-            bgmAudio.pause();
-        } else {
-            if (audioUnlocked && gameActive) {
-                bgmAudio.play().catch(e => console.log);
-            }
-        }
+        if (musicMuted) bgmAudio.pause();
+        else if (audioUnlocked && gameActive) bgmAudio.play().catch(e=>console.log);
     }
+    function setVolume(val) { bgmAudio.volume = val / 100; }
     
-    function setVolume(val) {
-        bgmAudio.volume = val / 100;
-    }
-    
-    // ---------- 游戏核心 ----------
+    // 游戏逻辑
     function loadBestScore() { try { let saved = localStorage.getItem('pilotBestScore'); bestScore = saved && !isNaN(parseInt(saved)) ? parseInt(saved) : 0; bestSpan.innerText = bestScore; } catch(e) { bestScore=0; bestSpan.innerText="0"; } }
     function saveBestScore() { if(score>bestScore) { bestScore=score; bestSpan.innerText=bestScore; try{localStorage.setItem('pilotBestScore',bestScore);}catch(e){} } }
     function updateDifficulty() { let factor = Math.min(1.0, score/480); currentBaseSpeed = Math.min(MAX_SPEED, Math.max(2.8, 3.2 + factor*(MAX_SPEED-3.2))); currentSpawnChance = Math.min(MAX_SPAWN, Math.max(0.016, 0.018 + factor*(MAX_SPAWN-0.018))); }
@@ -253,19 +162,11 @@
     function trySpawn() { if(!gameActive) return; if(Math.random()<currentSpawnChance) spawnProjectile(); if(score>150 && Math.random()<0.12 && currentSpawnChance>0.03) spawnProjectile(); }
     function clampPlayer() { playerX = Math.min(LOGIC_W-PLAYER_RADIUS, Math.max(PLAYER_RADIUS, playerX)); playerY = Math.min(LOGIC_H-PLAYER_RADIUS-6, Math.max(PLAYER_RADIUS+8, playerY)); }
     
-    // 统一处理输入坐标 (鼠标/触摸) 转为逻辑坐标
-    function getCanvasCoords(e) {
+    // 触摸/鼠标坐标转换核心函数
+    function getCanvasCoordsFromClient(clientX, clientY) {
         const rect = canvas.getBoundingClientRect();
         const scaleX = LOGIC_W / rect.width;
         const scaleY = LOGIC_H / rect.height;
-        let clientX, clientY;
-        if (e.touches) {
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
-        } else {
-            clientX = e.clientX;
-            clientY = e.clientY;
-        }
         let canvasX = (clientX - rect.left) * scaleX;
         let canvasY = (clientY - rect.top) * scaleY;
         canvasX = Math.min(LOGIC_W - PLAYER_RADIUS, Math.max(PLAYER_RADIUS, canvasX));
@@ -273,24 +174,53 @@
         return { x: canvasX, y: canvasY };
     }
     
-    function handleInput(e) {
-        e.preventDefault();  // 防止滚动
-        unlockAudio();
-        const { x, y } = getCanvasCoords(e);
+    // 直接更新玩家位置
+    function updatePlayerPosition(clientX, clientY) {
+        const { x, y } = getCanvasCoordsFromClient(clientX, clientY);
         if (gameActive) {
             playerX = x;
             playerY = y;
         }
     }
     
-    function handleMove(e) {
-        handleInput(e);
+    // ----- 触摸事件 (手机) -----
+    function onTouchStart(e) {
+        e.preventDefault();
+        unlockAudio();
+        if (e.touches.length) {
+            const touch = e.touches[0];
+            updatePlayerPosition(touch.clientX, touch.clientY);
+        }
     }
     
-    function resetGame() { projectiles = []; score=0; scoreSpan.innerText="0"; currentBaseSpeed=3.2; currentSpawnChance=0.018; playerX = Math.min(LOGIC_W-PLAYER_RADIUS, Math.max(PLAYER_RADIUS, LOGIC_W/2)); playerY = LOGIC_H-70; gameActive=true; if(bestScore>0) bestSpan.innerText=bestScore; else loadBestScore(); updateDifficulty(); initProjectiles(6+Math.floor(Math.random()*4)); if(!musicMuted && audioUnlocked) { bgmAudio.play().catch(e=>console.log); } }
+    function onTouchMove(e) {
+        e.preventDefault();
+        if (e.touches.length) {
+            const touch = e.touches[0];
+            updatePlayerPosition(touch.clientX, touch.clientY);
+        }
+    }
+    
+    // ----- 鼠标事件 (PC) -----
+    function onMouseMove(e) {
+        unlockAudio();
+        updatePlayerPosition(e.clientX, e.clientY);
+    }
+    
+    function resetGame() {
+        projectiles = []; score=0; scoreSpan.innerText="0";
+        currentBaseSpeed=3.2; currentSpawnChance=0.018;
+        playerX = Math.min(LOGIC_W-PLAYER_RADIUS, Math.max(PLAYER_RADIUS, LOGIC_W/2));
+        playerY = LOGIC_H-70;
+        gameActive=true;
+        if(bestScore>0) bestSpan.innerText=bestScore; else loadBestScore();
+        updateDifficulty();
+        initProjectiles(6+Math.floor(Math.random()*4));
+        if(!musicMuted && audioUnlocked) { bgmAudio.play().catch(e=>console.log); }
+    }
     function restartGame() { resetGame(); }
     
-    // ---------- 绘图 (不变) ----------
+    // 绘图函数
     function drawStars() { for(let i=0;i<180;i++) { let sx=(i*131)%LOGIC_W, sy=(i*253)%LOGIC_H; ctx.fillStyle=`rgba(255,240,200,${0.3+Math.sin(Date.now()*0.003+i)*0.2})`; ctx.beginPath(); ctx.arc(sx,sy,1.2,0,Math.PI*2); ctx.fill(); } }
     function drawPlayer() { ctx.save(); ctx.shadowBlur=12; ctx.shadowColor="#0af"; let jet=3+Math.sin(Date.now()*0.015)*3; ctx.beginPath(); ctx.moveTo(playerX-12,playerY+12); ctx.lineTo(playerX,playerY+22+jet); ctx.lineTo(playerX+12,playerY+12); ctx.fillStyle="#ff7b2c"; ctx.fill(); ctx.beginPath(); ctx.moveTo(playerX-6,playerY+14); ctx.lineTo(playerX,playerY+20+jet*0.7); ctx.lineTo(playerX+6,playerY+14); ctx.fillStyle="#ffb347"; ctx.fill(); ctx.beginPath(); ctx.moveTo(playerX,playerY-22); ctx.lineTo(playerX-18,playerY+6); ctx.lineTo(playerX-8,playerY+2); ctx.lineTo(playerX-8,playerY+10); ctx.lineTo(playerX,playerY+4); ctx.lineTo(playerX+8,playerY+10); ctx.lineTo(playerX+8,playerY+2); ctx.lineTo(playerX+18,playerY+6); ctx.closePath(); let grad=ctx.createLinearGradient(playerX-8,playerY-8,playerX+8,playerY+12); grad.addColorStop(0,'#5bc0ff'); grad.addColorStop(1,'#2b6fcf'); ctx.fillStyle=grad; ctx.fill(); ctx.strokeStyle="#c0f4ff"; ctx.lineWidth=1.5; ctx.stroke(); ctx.beginPath(); ctx.arc(playerX,playerY-8,4,0,Math.PI*2); ctx.fillStyle="#aaffff"; ctx.fill(); ctx.fillStyle="white"; ctx.beginPath(); ctx.arc(playerX-1,playerY-9,1.2,0,Math.PI*2); ctx.fill(); ctx.restore(); }
     function drawProjectiles() { for(let p of projectiles) { ctx.save(); ctx.shadowBlur=8; ctx.shadowColor="#f66"; let grad=ctx.createRadialGradient(p.x-3,p.y-3,2,p.x,p.y,p.radius); grad.addColorStop(0,'#ff4d4d'); grad.addColorStop(1,'#aa0000'); ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(p.x,p.y,p.radius-1,0,Math.PI*2); ctx.fill(); ctx.fillStyle="#ff9f4a"; ctx.beginPath(); ctx.arc(p.x-2,p.y-2,3,0,Math.PI*2); ctx.fill(); ctx.restore(); } }
@@ -301,20 +231,25 @@
     function render() { ctx.clearRect(0,0,LOGIC_W,LOGIC_H); drawStars(); drawProjectiles(); drawPlayer(); drawHUD(); if(!gameActive) drawGameOver(); }
     function gameLoop() { updateGame(); render(); requestAnimationFrame(gameLoop); }
     
-    // 事件绑定 (支持鼠标+触摸)
+    // 事件绑定 (确保移动端触摸有效)
     function attachEvents() {
-        canvas.addEventListener('mousemove', handleMove);
-        canvas.addEventListener('touchmove', handleMove, { passive: false });
-        canvas.addEventListener('touchstart', handleMove, { passive: false });
+        // 鼠标控制
+        canvas.addEventListener('mousemove', onMouseMove);
+        // 触摸控制
+        canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+        canvas.addEventListener('touchend', (e) => e.preventDefault());
         canvas.addEventListener('click', unlockAudio);
-        restartBtn.addEventListener('click', () => { restartGame(); });
+        restartBtn.addEventListener('click', () => restartGame());
         muteToggleBtn.addEventListener('click', toggleMute);
         volumeSlider.addEventListener('input', (e) => setVolume(e.target.value));
-        // 防止页面滚动
-        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); unlockAudio(); }, { passive: false });
+        // 全局禁止页面滚动 (针对画布外区域)
+        document.body.addEventListener('touchmove', (e) => {
+            if (e.target === canvas || canvas.contains(e.target)) e.preventDefault();
+        }, { passive: false });
     }
     
-    // 初始化
+    // 启动
     loadBestScore();
     resetGame();
     attachEvents();
